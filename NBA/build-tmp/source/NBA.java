@@ -3,6 +3,9 @@ import processing.data.*;
 import processing.event.*; 
 import processing.opengl.*; 
 
+import de.bezier.data.sql.*; 
+import de.bezier.guido.*; 
+
 import java.util.HashMap; 
 import java.util.ArrayList; 
 import java.io.File; 
@@ -14,135 +17,292 @@ import java.io.IOException;
 
 public class NBA extends PApplet {
 
-ArrayList<Shot> shots;
+
+
+
+
+PostgreSQL pgsql;
+// ArrayList<Shot> shots;
 PShape court;
 HexGrid grid;
-int[] gridSize = {25, 25};
+int[] gridSize = {25, 21};
 float radius;
 int size_scale = 2;
+Hexagon selectedHex = null;
+HexDetails details;
+Canvas courtCanvas;
+Canvas detailCanvas;
+Canvas selectionCanvas;
+Controller controller;
+Selection selectionUI;
+
 
 public void setup() {
-	size(500*size_scale, 350*size_scale, P2D);
-	// size(1000, 800);
-	radius = width/((gridSize[0] -1 )*sqrt(3));
-	grid = new HexGrid(gridSize, radius);
-	// ArrayList<File> files = getDataFileList("data");
-	// println(isCountRecordsCorrect(files));
-	shots = getData("durant.csv");
-	court = loadShape("img/NBA_ready.svg");
-	PShape hexShape = createHex(width/10);
+    size(1300, 700, P2D);
+    Interactive.make(this);
+    courtCanvas = new Canvas(0, 0, 1000, 700);
+    // detailCanvas = new Canvas(1000, 0, 300, 300);
+    selectionCanvas = new Canvas(1000, 0, 300, 700);
+    radius = courtCanvas.w/((gridSize[0] -1 )*sqrt(3));
+    grid = new HexGrid(gridSize, radius, courtCanvas);
+    initController();
+    selectionUI = new Selection(selectionCanvas, controller);
+    controller.applaySelection();
+    court = loadShape("img/NBA_ready.svg");
+    grid.hexShape.fill(200);
+}
 
-	// hexagon = new Hexagon(hexShape, center);
-	grid.hexShape.fill(200);
+public void initController() {
+    String user     = "nba";
+    String pass     = "hexhex";
+    String database = "NBAdb";
+    pgsql = new PostgreSQL( this, "localhost", database, user, pass );
+    controller = new Controller(pgsql, grid);
 }
 
 
 public void draw() {
-	background(255);
-	// pushMatrix();
-	// translate(100, 100);
-	// scale(.5);
-	grid.display();
-	// popMatrix();
-	shape(court, 0, 0, 1000, 1000*28/50);
-	for (Shot s : shots) {
-		s.draw();
-	}
-	// hexagon.display();
+    background(255);
+    grid.display();
+    shape(court, 0, 0, courtCanvas.w, courtCanvas.w*28/50);
+    // hexagon.display();
+    // details.display();
+    // detailCanvas.drawRect(220);
+    selectionCanvas.drawRect(250);
+    selectionUI.display();
 }
 
-public ArrayList<File> getDataFileList(String folderName) {
-	File folder = new File(folderName);
-	File[] listOfFiles = folder.listFiles();
-	ArrayList<File> dataFiles = new ArrayList<File>();
-	String pattern = "nba_savant(\\w*).csv";
-	for (int i = 0; i < listOfFiles.length; i++) {
-		if (listOfFiles[i].isFile()) {
-			if (listOfFiles[i].getName().matches(pattern)) {
-				dataFiles.add(listOfFiles[i]);
-			}
-		} else if (listOfFiles[i].isDirectory()) {
-			println("Directory " + listOfFiles[i].getName());
+
+// void mouseMoved() {
+//     try {
+//         Hexagon newHex = grid.get_hexagon_fromXY(mouseX, mouseY);
+//         if (newHex != selectedHex) {
+//             if (selectedHex != null) {
+//                 // selectedHex.set_selected(false);
+//             }
+//             selectedHex = newHex;
+//             // selectedHex.set_selected(true);
+//             // details.set_newHex(newHex);
+//         }
+//     } catch (ArrayIndexOutOfBoundsException e) {
+//         // selectedHex.set_selected(false);
+//         selectedHex = null;
+//         // details.set_newHex(null);
+//     }
+// }
+public class Canvas {
+  float x;
+  float y;
+  float w;
+  float h;
+  ArrayList<Canvas> selections;
+  
+  Canvas(float x, float y, float w, float h) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.selections = new ArrayList<Canvas>();
+  } 
+  
+  // void addSelection(float x, float y, float w, float h)
+  // {
+  //   if (w < 0) {
+  //     x += w;
+  //     w *= -1; 
+  //   }
+  //   if (h < 0) {
+  //     y += h;
+  //     h *= -1; 
+  //   }
+  //   selections.add(new Canvas(x, y, w, h));
+  //   print("ADDED SELECTION\n");
+  // }
+  
+  // void clearSelections()
+  // {
+  //   selections = new ArrayList<Canvas>(); 
+  // }
+  
+  // void drawSelections()
+  // {
+  //   stroke(0, 255, 0);
+  //   for (int i = 0; i < selections.size(); i++) {
+  //     selections.get(i).drawRect(0, 150, 0);
+  //   } 
+  // }
+  
+  public void update(float x, float y, float w, float h) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+  }
+  
+  public void drawRect(float val)
+  {
+    stroke(0);
+    fill(val);
+    strokeWeight(1);
+    rect(x, y, w, h); 
+  }
+  
+  public void drawRect(float v1, float v2, float v3)
+  {
+    stroke(0);
+    fill(v1, v2, v3);
+    strokeWeight(1);
+    rect(x, y, w, h); 
+  }
+  
+  public boolean mouseOver()
+  {
+    return covers(mouseX, mouseY); 
+  }
+  
+  public boolean covers(float px, float py)
+  {
+    return (px > x && px < x + w && py > y && py < y + h);
+  }
+}
+public class CheckBox {
+    boolean checked;
+    float x, y, width, height;
+    String label;
+    float padx = 6;
+    
+    CheckBox ( String l, float xx, float yy, float ww, float hh ) {
+        label = l;
+        x = xx; y = yy; width = ww; height = hh;
+        Interactive.add( this );
+    }
+    
+    public void mouseReleased () {
+        checked = !checked;
+        Interactive.send( this, "checkboxChenged", label, checked );
+    }
+    
+    public void draw () {
+        noStroke();
+        fill( 200 );
+        rect( x, y, width, height );
+        if ( checked )
+        {
+            fill( 80 );
+            rect( x+2, y+2, width-4, height-4 );
+        }
+        fill( 120 );
+        textAlign( LEFT );
+        text( label, x+width+padx, y+height );
+        stroke(0);
+    }
+    
+    // this is a special inside test that includes the label text
+    
+    public boolean isInside ( float mx, float my ) {
+        return Interactive.insideRect( x,y,width+padx+textWidth(label), height, mx, my );
+    }
+}
+public class Controller  {
+    PostgreSQL pgsql;
+    HexGrid grid;
+    String madeLabel = "all";
+    boolean[] quarters = {false, false, false, false, false};
+    float[] shot_clock = {.0f, 24.0f};
+
+    public Controller (PostgreSQL pgsql, HexGrid grid) {
+        this.pgsql = pgsql;
+        this.grid = grid;
+    }
+
+    public void applaySelection() {
+        this.grid.resetHexData();
+        if (this.pgsql.connect()) {
+            String query = "SELECT x, y, name  FROM shots";
+            query += getConditionQuerry();
+            println("query: "+query);
+            this.pgsql.query(query);
+            while (this.pgsql.next()) {
+                int x = this.pgsql.getInt("x") + 250;
+                int y = this.pgsql.getInt("y") + 40;
+                String name = this.pgsql.getString("name");
+                this.grid.addShot(x, y, name);
+            }
+        }
+    }
+
+    public String getConditionQuerry() {
+        String startQuerry = " WHERE ";
+        String quarterQuerry = "";
+        String conditionQuerry = "(shot_clock>" + this.shot_clock[0] + " AND shot_clock<" + this.shot_clock[1] + ")";
+        for (int i = 0; i < 5; ++i) {
+            if (quarters[i]) {
+                if (quarterQuerry != "") {
+                    quarterQuerry += " OR ";
+                }
+                quarterQuerry += " period=" + str(i+1);
+            }
+        }
+        if (quarterQuerry != "") {
+            conditionQuerry += " AND (" + quarterQuerry + ")";
+        }
+        if (madeLabel != "all") {
+            String madeQuerry = "";
+            if (madeLabel == "not made") {
+                madeQuerry = "shot_made_flag=false";
+                
+            } else {
+                madeQuerry = "shot_made_flag=true";
+            }
+            conditionQuerry += " AND " + madeQuerry;
+        }
+        return startQuerry + conditionQuerry;
+    }
+
+}
+
+public class HexDetails  {
+	Hexagon currentHex = null;
+	// Canvas canvas;
+	PShape  hexShape;
+
+
+	public HexDetails (float r) {
+		this.hexShape = createHex(2*r);
+	}
+
+
+	public void set_newHex(Hexagon newHex) {
+		this.currentHex = newHex;
+	}
+
+	public void display() {
+		if (currentHex != null) {
+			pushMatrix();
+			translate(currentHex.center[0], currentHex.center[1]);
+			fill(0, 0, 255);
+			shape(this.hexShape);
+			popMatrix();
 		}
 	}
-	return dataFiles;
-}
-
-public boolean isCountRecordsCorrect(ArrayList<File> dataFiles) {
-	int sum = 0;
-	for (File f : dataFiles) {
-		String [] filedata = loadStrings(f);
-		println("filedata.length: " + filedata.length);
-		sum += filedata.length -1;
-	}
-	// check hardcoded record num with expected value
-	if (sum == 204126) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-public ArrayList<Shot> getData(String file)
-{
-  ArrayList<Shot> d = new ArrayList<Shot>();
-  String [] filedata = loadStrings(file);
-  int len = filedata.length - 1;
-  // Hexagon currentHex;
-  String [] cur;
-   for (int i = 1; i <= len; i++) {
-     cur = splitTokens(filedata[i], ",");
-     // print("cur[15]: "+cur[15]);
-     // print("   ");
-     // println("cur[16]: "+cur[16]);
-     int x = PApplet.parseInt(cur[15])+250;
-     int y = PApplet.parseInt(cur[16])+40;
-     boolean made = false;
-     if (PApplet.parseInt(cur[10]) != 0) {
-     	made = true;
-     }
-     d.add(new Shot(x, y, made));
-     // currentHex = grid.get_hexagon_fromXY(x*size_scale, y*size_scale);
-     grid.addShot(x*size_scale, y*size_scale, cur[0], made);
-   }
-   return d;
-}
-
-
-public class Shot  {
-	int x;
-	int y;
-	int r = 4;
-	boolean made = false;
-
-	public Shot (int x, int y, boolean made) {
-		this.x = x*2;
-		this.y = y*2;
-		this.made = made;
-	}
-
-	public void draw() {
-		if (this.made) {
-			fill(0, 255, 100);
-		} else {
-			fill(255, 0, 100);
-		}
-		ellipse(this.x, this.y, this.r, this.r); 
-	}
-
 }
 public class HexGrid  {
 	int[] size;
 	float r;
 	Hexagon[][] grid;
 	PShape  hexShape;
+	Canvas c;
+	int maxVal = 0;
+	float scale;
 
-	public HexGrid (int[] size, float r) {
+	public HexGrid (int[] size, float r, Canvas canvas) {
 		this.size = size;
 		this.r = r;
+		this.c = canvas;
 		this.grid = new Hexagon[size[0]][size[1]];
 		this.hexShape = createHex(this.r);
 		this.createGrid();
+		this.scale = min(canvas.w/500, canvas.h/350);
 	}
 
 	public void createGrid() {
@@ -166,14 +326,24 @@ public class HexGrid  {
 		}
 	}
 
-	public boolean addShot(int x, int y, String playerName, boolean made) {
+	public boolean addShot(int x, int y, String playerName) {
 		try {
-			Hexagon currHex = this.get_hexagon_fromXY(x, y);
-			currHex.addShot(playerName, made);
+			float x_scaled = x*this.scale;
+			float y_scaled = y*this.scale;
+			Hexagon currHex = this.get_hexagon_fromXY(x_scaled, y_scaled);
+			currHex.addShot(playerName);
 			return true;
 		} catch (ArrayIndexOutOfBoundsException e) {
-			println("out of bound");
+			// println("out of bound");
 			return false;
+		}
+	}
+
+	public void resetHexData() {
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				h.resetData();
+			}
 		}
 	}
 
@@ -199,16 +369,35 @@ public class HexGrid  {
 		return grid[ix][iy];
 	}
 
-	public int[] get_hexIndex(int[] index) {
+	public int[] get_hexIndex_from_xy(int x, int y) {
+		int q = round((sqrt(3)*x/3 - y/3)/this.r);
+		int p = round((2*y)/(3*this.r));
+		return new int[] {q, p};
+	}
+
+	public int[] get_hexIndex_from_index(int[] index) {
 		index[0] = index[0] - index[1]/2;
 		return index;
 	}
 
 	public float[] get_hexCenter(int[] coords){
-		int hexCords[] = this.get_hexIndex(coords);
+		int hexCords[] = this.get_hexIndex_from_index(coords);
 		float h = (this.r*sqrt(3)/2);
 		float[] vec = {h*(2*hexCords[0] + hexCords[1]), 1.5f*this.r*hexCords[1]};
 		return vec;
+	}
+
+	public void update_maxVal() {
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				this.maxVal = max(max(h.shots.valueArray()), maxVal);
+			}
+		}
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				h.set_maxVal(this.maxVal);
+			}
+		}
 	}
 
 }
@@ -216,42 +405,52 @@ public class HexGrid  {
 public class Hexagon  {
 	float[] center;
 	PShape hexShape;
-	IntDict allShots;
-	IntDict madeShots;
+	IntDict shots;
+	boolean selected = false;
+	int maxVal = 30; // brightness
 
 	public Hexagon (PShape hexShape, float[] center) {
 		this.hexShape = hexShape;
 		this.center = center;
-		this.allShots = new IntDict();
-		this.allShots.set("", 0);
-		this.madeShots = new IntDict();
-		this.madeShots.set("", 0);
+		this.shots = new IntDict();
+		this.shots.set("", 0);
 	}
 
 	public void display() {
-		float val = 20.0f*max(allShots.valueArray());
+		// Calc shot accuracy
+		float val = max(shots.valueArray())*255/this.maxVal;
 		fill(val);
 		pushMatrix();
 		translate(this.center[0], this.center[1]);
+		// if (this.selected) {
+		// 	fill(0, 255, 0);
+		// 	scale(2.0);
+		// }
 		shape(this.hexShape);
 		popMatrix();
 	}
 
-	public void addShot(String playerName, boolean made) {
+	public void addShot(String playerName) {
 		int allNum = 0;
-		if (this.allShots.hasKey(playerName)) {
-			allNum = this.allShots.get(playerName);
+		if (this.shots.hasKey(playerName)) {
+			allNum = this.shots.get(playerName) + 1;
 		}
-		this.allShots.set(playerName, ++allNum);
-		if (made) {
-			int madeNum = 0;
-			if (this.madeShots.hasKey(playerName)) {
-				madeNum = this.madeShots.get(playerName);
-			}
-			madeNum = this.madeShots.get(playerName);
-			this.madeShots.set(playerName, ++madeNum);
-		}
+		this.shots.set(playerName, allNum);
 	}
+
+	// void set_selected(boolean b)  {
+	// 	this.selected = b;
+	// }
+
+	public void set_maxVal(int maxVal) {
+		this.maxVal = maxVal;
+	}
+
+	public void resetData() {
+		this.shots = new IntDict();
+		this.shots.set("", 0);
+	}
+
 }
 
 public PShape createHex(float r) {
@@ -270,6 +469,225 @@ public PShape createHex(float r) {
 	return hexShape;
 }
 
+public class MadeButton {
+    float x, y, width, height;
+    boolean on = true;
+    String[] labels;
+    float padx = 6;
+    int currentLabel = 0;
+    
+    MadeButton ( float xx, float yy, float w, float h, String[] labels ) {
+        x = xx; y = yy; width = w; height = h;
+        this.labels = labels;
+        Interactive.add( this ); // register it with the manager
+    }
+    
+    // called by manager
+    
+    public void mousePressed () {
+        on = !on;
+    }
+    public void mouseReleased () {
+        on = !on;
+        currentLabel += 1;
+        currentLabel = currentLabel % 3;
+        Interactive.send( this, "labelChanged", labels[currentLabel] );
+    }
+
+    public void draw () {
+        if ( on ) fill( 200 );
+        else fill( 100 );
+        noStroke();
+        rect(x, y, width, height);
+        textAlign( LEFT );
+        fill( 100 );
+        text( labels[currentLabel], x+width+padx, y+height );
+        stroke(0);
+    }
+
+    public boolean isInside ( float mx, float my ) {
+        return Interactive.insideRect( x,y,width+padx+textWidth(labels[currentLabel]), height, mx, my );
+    }
+}
+public class MultiSlider
+{
+    float x,y,width,height;
+    float pressedX, pressedY;
+    float pressedXLeft, pressedYLeft, pressedXRight, pressedYRight;
+    boolean on = false;
+    
+    SliderHandle left, right, activeHandle;
+    
+    float values[];
+    
+    MultiSlider ( float xx, float yy, float ww, float hh )
+    {
+        this.x = xx; this.y = yy; this.width = ww; this.height = hh;
+        
+        left  = new SliderHandle( x, y, height, height );
+        right = new SliderHandle( x+width-height, y, height, height );
+        
+        values = new float[]{0,1};
+        
+        Interactive.add( this );
+    }
+    
+    public void mouseEntered ()
+    {
+        on = true;
+    }
+    
+    public void mouseExited ()
+    {
+        on = false;
+    }
+    
+    public void mousePressed ( float mx, float my )
+    {
+        if ( left.isInside( mx, my ) )       activeHandle = left;
+        else if ( right.isInside( mx, my ) ) activeHandle = right;
+        else                                 activeHandle = null;
+        
+        pressedX = mx;
+        pressedXLeft  = left.x;
+        pressedXRight = right.x;
+    }
+
+    public void mouseReleased() {
+        Interactive.send( this, "applayVal");
+    }
+    
+    public void mouseDragged ( float mx, float my )
+    {
+        float vx = mx - left.width/2;
+        vx = constrain( vx, x, x+width-left.width );
+        
+        if ( activeHandle == left )
+        {
+            if ( vx > right.x-left.width ) vx = right.x-left.width;
+            values[0] = map( vx, x, x+width-left.width, 0, 1 );
+            
+            Interactive.send( this, "valueChanged", values[0] , values[1] );
+        }
+        else if ( activeHandle == right )
+        {
+            if ( vx < left.x+left.width ) vx = left.x+left.width;
+            values[1] = map( vx, x, x+width-left.width, 0, 1 );
+            
+            Interactive.send( this, "valueChanged", values[0] , values[1] );
+        }
+        else // dragging in between handles
+        {
+            float dx = mx-pressedX;
+            
+            if ( pressedXLeft + dx >= x && pressedXRight + dx <= x+(width-right.width) )
+            {
+                values[0] = map( pressedXLeft + dx,  x, x+width-left.width, 0, 1 );
+                left.x = pressedXLeft + dx;
+                
+                values[1] = map( pressedXRight + dx, x, x+width-left.width, 0, 1 );
+                right.x = pressedXRight + dx;
+                
+                Interactive.send( this, "valueChanged", values[0] , values[1] );
+            }
+        }
+        
+        if ( activeHandle != null ) activeHandle.x = vx;
+    }
+    
+    public void draw ()
+    {
+        noStroke();
+        fill( 120 );
+        rect( x, y, width, height );
+        fill( on ? 200 : 150 );
+        rect( left.x, left.y, right.x-left.x+right.width, right.height );
+        text("0", x ,y+25);
+        text("12", x+width/2-textWidth("12") ,y+25);
+        text("24 s", x+width-textWidth("24") ,y+25);
+    }
+    
+    public boolean isInside ( float mx, float my )
+    {
+        return left.isInside(mx,my) || right.isInside(mx,my) || Interactive.insideRect( left.x, left.y, (right.x+right.width)-left.x, height, mx, my );
+    }
+}
+
+class SliderHandle
+{
+    float x,y,width,height;
+    
+    SliderHandle ( float xx, float yy, float ww, float hh )
+    {
+        this.x = xx; this.y = yy; this.width = ww; this.height = hh;
+    }
+    
+    public void draw ()
+    {
+        rect( x, y, width, height );
+    }
+    
+    public boolean isInside ( float mx, float my )
+    {
+        return Interactive.insideRect( x, y, width, height, mx, my );
+    }
+}
+public class Selection {
+    Canvas c;
+    CheckBox[] quartersBtn;
+    MadeButton shotMadeBtn;
+    MultiSlider clockSlider;
+
+    public Selection (Canvas canvas, Controller controller) {
+        this.c = canvas;
+        quartersBtn = new CheckBox[4];
+        for ( int i = 0; i < 4; ++i ) {
+            quartersBtn[i] = new CheckBox( str(i+1), c.x + 20 + i*40, c.y + 90, 10, 10 );
+            Interactive.on( quartersBtn[i], "checkboxChenged",  this, "quarterChanged" );
+        }
+
+        String labels[] = {"all", "made", "not made"};
+        shotMadeBtn = new MadeButton(c.x + 20, c.y + 30, 10, 10, labels);
+        Interactive.on( shotMadeBtn, "labelChanged",  this, "madeChanged" );
+
+        clockSlider = new MultiSlider( c.x + 20, c.y+140, c.w-40, 10 );
+        Interactive.on( clockSlider, "valueChanged",  this, "clockChanged" );
+        Interactive.on( clockSlider, "applayVal",  this, "applay" );
+    }
+
+    public void display() {
+        fill(0, 102, 153);
+        textAlign( LEFT );
+        text( "SHOTS", c.x + 20, c.y + 20 );
+        text( "QUARTERS", c.x + 20, c.y + 80 );
+        text( "SHOT CLOCK", c.x + 20, c.y + 130 );
+        for (CheckBox b : quartersBtn) {
+            b.draw();
+        }
+    }
+
+    public void applay() {
+        controller.applaySelection();
+    }
+
+    public void madeChanged(String label) {
+        controller.madeLabel = label;
+        controller.applaySelection();
+    }
+
+    public void clockChanged(float minVal, float maxVal) {
+        controller.shot_clock[0] = minVal*24;
+        controller.shot_clock[1] = maxVal*24;
+        // controller.applaySelection();
+    }
+
+    public void quarterChanged(String label, boolean checked) {
+        int i = PApplet.parseInt(label);
+        controller.quarters[i-1] = checked;
+        controller.applaySelection();
+    }
+
+}
   static public void main(String[] passedArgs) {
     String[] appletArgs = new String[] { "NBA" };
     if (passedArgs != null) {

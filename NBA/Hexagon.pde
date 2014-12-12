@@ -2,42 +2,52 @@
 public class Hexagon  {
 	float[] center;
 	PShape hexShape;
-	IntDict allShots;
-	IntDict madeShots;
+	IntDict shots;
+	boolean selected = false;
+	int maxVal = 30; // brightness
 
 	public Hexagon (PShape hexShape, float[] center) {
 		this.hexShape = hexShape;
 		this.center = center;
-		this.allShots = new IntDict();
-		this.allShots.set("", 0);
-		this.madeShots = new IntDict();
-		this.madeShots.set("", 0);
+		this.shots = new IntDict();
+		this.shots.set("", 0);
 	}
 
 	void display() {
-		float val = 20.0*max(allShots.valueArray());
+		// Calc shot accuracy
+		float val = max(shots.valueArray())*255/this.maxVal;
 		fill(val);
 		pushMatrix();
 		translate(this.center[0], this.center[1]);
+		// if (this.selected) {
+		// 	fill(0, 255, 0);
+		// 	scale(2.0);
+		// }
 		shape(this.hexShape);
 		popMatrix();
 	}
 
-	void addShot(String playerName, boolean made) {
+	void addShot(String playerName) {
 		int allNum = 0;
-		if (this.allShots.hasKey(playerName)) {
-			allNum = this.allShots.get(playerName);
+		if (this.shots.hasKey(playerName)) {
+			allNum = this.shots.get(playerName) + 1;
 		}
-		this.allShots.set(playerName, ++allNum);
-		if (made) {
-			int madeNum = 0;
-			if (this.madeShots.hasKey(playerName)) {
-				madeNum = this.madeShots.get(playerName);
-			}
-			madeNum = this.madeShots.get(playerName);
-			this.madeShots.set(playerName, ++madeNum);
-		}
+		this.shots.set(playerName, allNum);
 	}
+
+	// void set_selected(boolean b)  {
+	// 	this.selected = b;
+	// }
+
+	void set_maxVal(int maxVal) {
+		this.maxVal = maxVal;
+	}
+
+	void resetData() {
+		this.shots = new IntDict();
+		this.shots.set("", 0);
+	}
+
 }
 
 PShape createHex(float r) {

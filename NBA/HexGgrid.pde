@@ -3,13 +3,18 @@ public class HexGrid  {
 	float r;
 	Hexagon[][] grid;
 	PShape  hexShape;
+	Canvas c;
+	int maxVal = 0;
+	float scale;
 
-	public HexGrid (int[] size, float r) {
+	public HexGrid (int[] size, float r, Canvas canvas) {
 		this.size = size;
 		this.r = r;
+		this.c = canvas;
 		this.grid = new Hexagon[size[0]][size[1]];
 		this.hexShape = createHex(this.r);
 		this.createGrid();
+		this.scale = min(canvas.w/500, canvas.h/350);
 	}
 
 	void createGrid() {
@@ -33,14 +38,24 @@ public class HexGrid  {
 		}
 	}
 
-	boolean addShot(int x, int y, String playerName, boolean made) {
+	boolean addShot(int x, int y, String playerName) {
 		try {
-			Hexagon currHex = this.get_hexagon_fromXY(x, y);
-			currHex.addShot(playerName, made);
+			float x_scaled = x*this.scale;
+			float y_scaled = y*this.scale;
+			Hexagon currHex = this.get_hexagon_fromXY(x_scaled, y_scaled);
+			currHex.addShot(playerName);
 			return true;
 		} catch (ArrayIndexOutOfBoundsException e) {
-			println("out of bound");
+			// println("out of bound");
 			return false;
+		}
+	}
+
+	void resetHexData() {
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				h.resetData();
+			}
 		}
 	}
 
@@ -66,16 +81,35 @@ public class HexGrid  {
 		return grid[ix][iy];
 	}
 
-	int[] get_hexIndex(int[] index) {
+	int[] get_hexIndex_from_xy(int x, int y) {
+		int q = round((sqrt(3)*x/3 - y/3)/this.r);
+		int p = round((2*y)/(3*this.r));
+		return new int[] {q, p};
+	}
+
+	int[] get_hexIndex_from_index(int[] index) {
 		index[0] = index[0] - index[1]/2;
 		return index;
 	}
 
 	float[] get_hexCenter(int[] coords){
-		int hexCords[] = this.get_hexIndex(coords);
+		int hexCords[] = this.get_hexIndex_from_index(coords);
 		float h = (this.r*sqrt(3)/2);
 		float[] vec = {h*(2*hexCords[0] + hexCords[1]), 1.5*this.r*hexCords[1]};
 		return vec;
+	}
+
+	void update_maxVal() {
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				this.maxVal = max(max(h.shots.valueArray()), maxVal);
+			}
+		}
+		for (Hexagon[] hexCol : this.grid) {
+			for (Hexagon h : hexCol) {
+				h.set_maxVal(this.maxVal);
+			}
+		}
 	}
 
 }
