@@ -1,9 +1,7 @@
 import de.bezier.data.sql.*;
 import de.bezier.guido.*;
 
-
 PostgreSQL pgsql;
-// ArrayList<Shot> shots;
 PShape court;
 HexGrid grid;
 int[] gridSize = {25, 21};
@@ -17,12 +15,10 @@ Canvas selectionCanvas;
 Controller controller;
 Selection selectionUI;
 
-
 void setup() {
     size(1300, 700, P2D);
     Interactive.make(this);
     courtCanvas = new Canvas(0, 0, 1000, 700);
-    // detailCanvas = new Canvas(1000, 0, 300, 300);
     selectionCanvas = new Canvas(1000, 0, 300, 700);
     radius = courtCanvas.w/((gridSize[0] -1 )*sqrt(3));
     grid = new HexGrid(gridSize, radius, courtCanvas);
@@ -37,37 +33,14 @@ void initController() {
     String user     = "nba";
     String pass     = "hexhex";
     String database = "NBAdb";
-    pgsql = new PostgreSQL( this, "localhost", database, user, pass );
+    pgsql = new PostgreSQL(this, "localhost", database, user, pass);
     controller = new Controller(pgsql, grid);
 }
-
 
 void draw() {
     background(255);
     grid.display();
     shape(court, 0, 0, courtCanvas.w, courtCanvas.w*28/50);
-    // hexagon.display();
-    // details.display();
-    // detailCanvas.drawRect(220);
     selectionCanvas.drawRect(250);
     selectionUI.display();
 }
-
-
-// void mouseMoved() {
-//     try {
-//         Hexagon newHex = grid.get_hexagon_fromXY(mouseX, mouseY);
-//         if (newHex != selectedHex) {
-//             if (selectedHex != null) {
-//                 // selectedHex.set_selected(false);
-//             }
-//             selectedHex = newHex;
-//             // selectedHex.set_selected(true);
-//             // details.set_newHex(newHex);
-//         }
-//     } catch (ArrayIndexOutOfBoundsException e) {
-//         // selectedHex.set_selected(false);
-//         selectedHex = null;
-//         // details.set_newHex(null);
-//     }
-// }
